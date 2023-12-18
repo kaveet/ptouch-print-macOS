@@ -65,6 +65,10 @@ in Font Book like **Bold** or **Italic** just append those modifiers. **Helvetic
 <span style="color:gray">choosing font size=95</span>
 
 
+And lastly: Here is an actual photo of the output as printed on my label maker:
+
+![](images/print.jpg)
+
 ### PT-2730
 
 My **PT-2730** always wants to put 1" of leader on each print. If the print is just simple

@@ -20,7 +20,7 @@ int gdImageBlue(gdImage *im, int index) {
  return gdImageGetPixel(im, index, 0);
 }
 
-// Since we are working in grayscale for black and white, jjust use the average.
+// Since we are working in grayscale for black and white, just use the average.
 int gdImageColorAllocate(gdImage *im, int red, int green, int blue) {
   return (red + green + blue)/3;
 }
@@ -154,7 +154,6 @@ void gdImageSetStyle(gdImage *im, int *style, int styleLength){
       sDashStyle = [NSData dataWithBytes:dash length:sizeof(CGFloat)];
     }
   }
-
 }
 
 char *gdImageStringFT(gdImage *im, int *brect, int fg, char *fontname, double ptsize, double angle, int x, int y, char *string) {
