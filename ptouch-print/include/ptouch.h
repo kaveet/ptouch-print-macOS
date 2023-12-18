@@ -18,7 +18,15 @@
 */
 
 #include <stdint.h>
+
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
+#if TARGET_OS_MAC // Oster: i.e., is Mac.
+#include "libusb.h"
+#else
 #include <libusb-1.0/libusb.h>
+#endif
 
 struct _pt_tape_info {
 	uint8_t mm;		/* Tape width in mm */

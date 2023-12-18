@@ -26,7 +26,14 @@
 #include <sys/stat.h>	/* open() */
 #include <fcntl.h>	/* open() */
 #include <time.h>	/* nanosleep(), struct timespec */
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
+#if TARGET_OS_MAC // Oster: i.e., is Mac.
+#include "include/config.h"
+#else
 #include "config.h"
+#endif
 #include "gettext.h"	/* gettext(), ngettext() */
 #include "ptouch.h"
 

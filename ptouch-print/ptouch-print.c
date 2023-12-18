@@ -2,6 +2,7 @@
 	ptouch-print - Print labels with images or text on a Brother P-Touch
 	
 	Copyright (C) 2015-2019 Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+  Copyright (C) 2023 David Phillip Oster <davidphilliposter@gmail.com>
 
 	This program is free software; you can redistribute it and/or modify it
 	under the terms of the GNU General Public License version 3 as
@@ -24,7 +25,16 @@
 #include <sys/types.h>	/* open() */
 #include <sys/stat.h>	/* open() */
 #include <fcntl.h>	/* open() */
-#include <gd.h>
+
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
+#if TARGET_OS_MAC // Oster: i.e., is Mac.
+#include "gd.h"
+#include <locale.h>
+#else
+#include <gd.h> // oster
+#endif
 #include "config.h"
 #include "gettext.h"	/* gettext(), ngettext() */
 #include "ptouch.h"
@@ -49,10 +59,10 @@ int parse_args(int argc, char **argv);
 
 // char *font_file="/usr/share/fonts/TTF/Ubuntu-M.ttf";
 // char *font_file="Ubuntu:medium";
-char *font_file="DejaVuSans";
+char *font_file="Helvetica"; // Oster
 char *save_png=NULL;
 int verbose=0;
-int fontsize=0;
+long fontsize=0;  // Oster
 bool debug=false;
 
 /* --------------------------------------------------------------------
@@ -73,15 +83,15 @@ int print_img(ptouch_dev ptdev, gdImage *im)
 	uint8_t rasterline[16];
 
 	if (!im) {
-		printf(_("nothing to print\n"));
+		fprintf(stderr, _("nothing to print\n"));
 		return -1;
 	}
 	tape_width=ptouch_getmaxwidth(ptdev);
 	/* find out whether color 0 or color 1 is darker */
 	d=(gdImageRed(im,1)+gdImageGreen(im,1)+gdImageBlue(im,1) < gdImageRed(im,0)+gdImageGreen(im,0)+gdImageBlue(im,0))?1:0;
 	if (gdImageSY(im) > tape_width) {
-		printf(_("image is too large (%ipx x %ipx)\n"), gdImageSX(im), gdImageSY(im));
-		printf(_("maximum printing width for this tape is %ipx\n"), tape_width);
+		fprintf(stderr, _("image is too large (%ipx x %ipx)\n"), gdImageSX(im), gdImageSY(im));
+		fprintf(stderr, _("maximum printing width for this tape is %ipx\n"), tape_width);
 		return -1;
 	}
 	offset=64-(gdImageSY(im)/2);	/* always print centered  */
@@ -92,7 +102,7 @@ int print_img(ptouch_dev ptdev, gdImage *im)
 	        ptouch_enable_packbits(ptdev);
 	}
 	if (ptouch_rasterstart(ptdev) != 0) {
-		printf(_("ptouch_rasterstart() failed\n"));
+		fprintf(stderr, _("ptouch_rasterstart() failed\n"));
 		return -1;
 	}
 	for (k=0; k<gdImageSX(im); k+=1) {
@@ -103,7 +113,7 @@ int print_img(ptouch_dev ptdev, gdImage *im)
 			}
 		}
 		if (ptouch_sendraster(ptdev, rasterline, 16) != 0) {
-			printf(_("ptouch_sendraster() failed\n"));
+			fprintf(stderr, _("ptouch_sendraster() failed\n"));
 			return -1;
 		}
 	}
@@ -143,7 +153,7 @@ int write_png(gdImage *im, const char *file)
 	FILE *f;
 
 	if ((f = fopen(file, "wb")) == NULL) {
-		printf(_("writing image '%s' failed\n"), file);
+		fprintf(stderr, _("writing image '%s' failed\n"), file);
 		return -1;
 	}
 	gdImagePng(im, f);
@@ -215,22 +225,22 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 		printf(_("render_text(): %i lines, font = '%s'\n"), lines, font);
 	}
 	if (gdFTUseFontConfig(1) != GD_TRUE) {
-		printf(_("warning: font config not available\n"));
+		fprintf(stderr, _("warning: font config not available\n"));
 	}
-	if (fontsize > 0) {
-		fsz=fontsize;
-		printf(_("setting font size=%i\n"), fsz);
+	if ((int)fontsize > 0 && (int)fontsize == fontsize) {
+		fsz= (int)fontsize;
+		fprintf(stderr, _("setting font size=%i\n"), fsz);
 	} else {
 		for (i=0; i<lines; i++) {
 			if ((tmp=find_fontsize(tape_width/lines, font, line[i])) < 0) {
-				printf(_("could not estimate needed font size\n"));
+				fprintf(stderr, _("could not estimate needed font size\n"));
 				return NULL;
 			}
 			if ((fsz == 0) || (tmp < fsz)) {
 				fsz=tmp;
 			}
 		}
-		printf(_("choosing font size=%i\n"), fsz);
+		fprintf(stderr, _("choosing font size=%i\n"), fsz);
 	}
 	for(i=0; i<lines; i++) {
 		tmp=needed_width(line[i], font_file, fsz);
@@ -246,7 +256,7 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 	int max_height=0;
 	for (i=0; i<lines; i++) {
 		if ((p=gdImageStringFT(NULL, &brect[0], -black, font, fsz, 0.0, 0, 0, line[i])) != NULL) {
-			printf(_("error in gdImageStringFT: %s\n"), p);
+			fprintf(stderr, _("error in gdImageStringFT: %s\n"), p);
 		}
 		//int ofs=get_baselineoffset(line[i], font_file, fsz);
 		int lineheight=brect[1]-brect[5];
@@ -265,7 +275,7 @@ gdImage *render_text(char *font, char *line[], int lines, int tape_width)
 			printf("debug: line %i pos=%i ofs=%i\n", i+1, pos, ofs);
 		}
 		if ((p=gdImageStringFT(im, &brect[0], -black, font, fsz, 0.0, 0, pos, line[i])) != NULL) {
-			printf(_("error in gdImageStringFT: %s\n"), p);
+			fprintf(stderr, _("error in gdImageStringFT: %s\n"), p);
 		}
 	}
 	return im;
@@ -356,19 +366,19 @@ gdImage *img_padding(int tape_width, int length)
 
 void usage(char *progname)
 {
-	printf("usage: %s [options] <print-command(s)>\n", progname);
-	printf("options:\n");
-	printf("\t--font <file>\t\tuse font <file> or <name>\n");
-	printf("\t--writepng <file>\tinstead of printing, write output to png file\n");
-	printf("\t\t\t\tThis currently works only when using\n\t\t\t\tEXACTLY ONE --text statement\n");
-	printf("print-commands:\n");
-	printf("\t--image <file>\t\tprint the given image which must be a 2 color\n");
-	printf("\t\t\t\t(black/white) png\n");
-	printf("\t--text <text>\t\tPrint 1-4 lines of text.\n");
-	printf("\t\t\t\tIf the text contains spaces, use quotation marks\n\t\t\t\taround it.\n");
-	printf("\t--cutmark\t\tPrint a mark where the tape should be cut\n");
-	printf("\t--fontsize\t\tManually set fontsize\n");
-	printf("\t--pad <n>\t\tAdd n pixels padding (blank tape)\n");
+	fprintf(stderr, "usage: %s [options] <print-command(s)>\n", progname);
+	fprintf(stderr, "options:\n");
+	fprintf(stderr, "\t--font <file>\t\tuse font <file> or <name>\n");
+	fprintf(stderr, "\t--writepng <file>\tinstead of printing, write output to png file\n");
+	fprintf(stderr, "\t\t\t\tThis currently works only when using\n\t\t\t\tEXACTLY ONE --text statement\n");
+	fprintf(stderr, "print-commands:\n");
+	fprintf(stderr, "\t--image <file>\t\tprint the given image which must be a 2 color\n");
+	fprintf(stderr, "\t\t\t\t(black/white) png\n");
+	fprintf(stderr, "\t--text <text>\t\tPrint 1-4 lines of text.\n");
+	fprintf(stderr, "\t\t\t\tIf the text contains spaces, use quotation marks\n\t\t\t\taround it.\n");
+	fprintf(stderr, "\t--cutmark\t\tPrint a mark where the tape should be cut\n");
+	fprintf(stderr, "\t--fontsize\t\tManually set fontsize\n");
+	fprintf(stderr, "\t--pad <n>\t\tAdd n pixels padding (blank tape)\n");
 	exit(1);
 }
 
@@ -425,7 +435,7 @@ int parse_args(int argc, char **argv)
 				i++;
 			}
 		} else if (strcmp(&argv[i][1], "-version") == 0) {
-			printf(_("ptouch-print version %s by Dominic Radermacher\n"), VERSION);
+			fprintf(stderr, _("ptouch-print by Dominic Radermacher, Mac version %s \n"), VERSION);
 			exit(0);
 		} else {
 			usage(argv[0]);
@@ -443,8 +453,11 @@ int main(int argc, char *argv[])
 	ptouch_dev ptdev=NULL;
 
 	setlocale(LC_ALL, "");
+#if TARGET_OS_MAC
+#else
 	bindtextdomain(PACKAGE, LOCALEDIR);
 	textdomain(PACKAGE);
+#endif
 	i=parse_args(argc, argv);
 	if (i != argc) {
 		usage(argv[0]);
@@ -453,10 +466,10 @@ int main(int argc, char *argv[])
 		return 5;
 	}
 	if (ptouch_init(ptdev) != 0) {
-		printf(_("ptouch_init() failed\n"));
+		fprintf(stderr, _("ptouch_init() failed\n"));
 	}
 	if (ptouch_getstatus(ptdev) != 0) {
-		printf(_("ptouch_getstatus() failed\n"));
+		fprintf(stderr, _("ptouch_getstatus() failed\n"));
 		return 1;
 	}
 	tape_width=ptouch_getmaxwidth(ptdev);
@@ -505,7 +518,7 @@ int main(int argc, char *argv[])
 			}
 			if (lines) {
 				if ((im=render_text(font_file, line, lines, tape_width)) == NULL) {
-					printf(_("could not render text\n"));
+					fprintf(stderr, _("could not render text\n"));
 					return 1;
 				}
 				out=img_append(out, im);
@@ -518,7 +531,7 @@ int main(int argc, char *argv[])
 			gdImageDestroy(im);
 			im = NULL;
 		} else if (strcmp(&argv[i][1], "-pad") == 0) {
-			int length=strtol(argv[++i], NULL, 10);
+			int length= (int)strtol(argv[++i], NULL, 10);
 			im=img_padding(tape_width, length);
 			out=img_append(out, im);
 			gdImageDestroy(im);
@@ -535,7 +548,7 @@ int main(int argc, char *argv[])
 		} else {
 			print_img(ptdev, out);
 			if (ptouch_eject(ptdev) != 0) {
-				printf(_("ptouch_eject() failed\n"));
+				fprintf(stderr, _("ptouch_eject() failed\n"));
 				return -1;
 			}
 		}

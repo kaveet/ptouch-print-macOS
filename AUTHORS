@@ -1,2 +1,6 @@
 
 ptouch-print written by Dominic Radermacher <blip@mockmoon-cybernetics.ch>
+ptouch-print (for Mac) modifications by David Phillip Oster david_phillip_oster@gmail.com
+https://github.com/libusb/libusb.git  - source for mac version of Linux's libusb
+ptouch-print works on bitmaps, using https://github.com/libgd  Rather than port the real one, I just wrote an adapter to Apple’s CoreGraphics library.
+
